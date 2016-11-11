@@ -11,7 +11,9 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.android.volley.Response;
 import com.google.android.gms.ads.identifier.AdvertisingIdClient;
@@ -47,10 +49,11 @@ import static com.google.android.gms.ads.identifier.AdvertisingIdClient.getAdver
 public class MainActivity extends AppCompatActivity implements  AsyncResponse{
 
     private TextView mTextView;
+    private ProgressBar progress;
     private Button mButton;
     private ListView list;
     private AdapterOffers adapter;
-    private MyAsyncTask asyncTask = new MyAsyncTask();
+    private MyAsyncTask asyncTask;
 
 
     final protected static char[] hexArray = "0123456789abcdef".toCharArray();
@@ -85,7 +88,7 @@ public class MainActivity extends AppCompatActivity implements  AsyncResponse{
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        asyncTask.delegate = this;
+
 
         mTextView = (TextView)findViewById(R.id.response);
         mButton = (Button)findViewById(R.id.btn);
@@ -94,22 +97,30 @@ public class MainActivity extends AppCompatActivity implements  AsyncResponse{
                 @Override
                 public void onClick(View v) {
 
-                asyncTask.execute();
+                    new MyAsyncTask(MainActivity.this).execute();
 
                 }
             });
 
         list = (ListView)findViewById(R.id.list);
+        progress = (ProgressBar)findViewById(R.id.progress);
 
 
     }
 
     @Override
-    public void processFinish(ArrayList<Offer> offers) {
+    public void processFinish(ArrayList<Offer> offers, boolean anyResults) {
 
-        adapter = new AdapterOffers(MainActivity.this,offers);
-        list.setAdapter(adapter);
-        adapter.notifyDataSetChanged();
+        if(anyResults) {
+            adapter = new AdapterOffers(MainActivity.this, offers);
+            list.setAdapter(adapter);
+            adapter.notifyDataSetChanged();
+        }
+        else
+          mTextView.setText("No data!");
+
+        progress.setVisibility(View.INVISIBLE);
+        mButton.setEnabled(true);
 
     }
 
@@ -120,8 +131,16 @@ public class MainActivity extends AppCompatActivity implements  AsyncResponse{
         String result = "";
         public AsyncResponse delegate = null;
 
+        public MyAsyncTask( AsyncResponse delegate) {
+            super();
+            this.delegate = delegate;
+        }
+
         protected void onPreExecute() {
 
+            progress.setVisibility(View.VISIBLE);
+            mButton.setEnabled(false);
+            mTextView.setText("");
         }
 
         @Override
@@ -200,11 +219,20 @@ public class MainActivity extends AppCompatActivity implements  AsyncResponse{
         protected void onPostExecute(Void v) {
             //parse JSON data
 
+            boolean anyResults = true;
+
             ArrayList<Offer> results = new ArrayList<Offer>();
             try {
 
                     JSONObject jObject = new JSONObject(result);
                     JSONArray offers = jObject.getJSONArray("offers");
+
+               String code = jObject.get("code").toString();
+                Log.d("Fyber", code+"");
+
+                if( code.equalsIgnoreCase("NO_CONTENT"))
+                    anyResults = false;
+
 
                 for( int i= 0 ; i < offers.length(); i++) {
                     String title = offers.getJSONObject(i).get("title").toString();
@@ -224,7 +252,7 @@ public class MainActivity extends AppCompatActivity implements  AsyncResponse{
             } // catch (JSONException e)
 
 
-           delegate.processFinish(results);
+           delegate.processFinish(results,anyResults);
 
 
         } // protected void onPostExecute(Void v)
